@@ -4,19 +4,19 @@ import java.awt.event.*;
 
 public class ChessGame extends JFrame {
     private static final int BOARD_SIZE = 8;
-    private static final int TILE_SIZE = 75;
+    private static final int TILE_SIZE = 100;
     private ChessBoard board;
     private boolean isWhiteTurn = true;
     private boolean isDefaultTheme = true;
     private static final Color DEFAULT_LIGHT = new Color(240, 217, 181);
     private static final Color DEFAULT_DARK = new Color(181, 136, 99);
     private static final Color ALTERNATE_LIGHT = new Color(224, 237, 217); 
-    private static final Color ALTERNATE_DARK = new Color(29, 13, 40);     
+    private static final Color ALTERNATE_DARK = new Color(29, 13, 40);
+    private static final String INITIAL_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
 
     public ChessGame() {
-        setTitle("Java Chess Game");
+        setTitle("Chess is a Game");
         setLayout(new BorderLayout());
-
         
         JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JToggleButton themeToggle = new JToggleButton("Theme");
@@ -44,7 +44,7 @@ public class ChessGame extends JFrame {
         public ChessBoard() {
             setPreferredSize(new Dimension(BOARD_SIZE * TILE_SIZE, BOARD_SIZE * TILE_SIZE));
             pieces = new ChessPiece[BOARD_SIZE][BOARD_SIZE];
-            initializePieces();
+            initializeFromFEN(INITIAL_FEN);
 
             addMouseListener(new MouseAdapter() {
                 @Override
@@ -56,28 +56,35 @@ public class ChessGame extends JFrame {
             });
         }
 
-        private void initializePieces() {
+        public void initializeFromFEN(String fen) {
+            // Clear the board first
+            pieces = new ChessPiece[BOARD_SIZE][BOARD_SIZE];
             
-            pieces[0] = new ChessPiece[]{
-                new ChessPiece('R', false), new ChessPiece('N', false),
-                new ChessPiece('B', false), new ChessPiece('Q', false),
-                new ChessPiece('K', false), new ChessPiece('B', false),
-                new ChessPiece('N', false), new ChessPiece('R', false)
-            };
-            for (int i = 0; i < BOARD_SIZE; i++) {
-                pieces[1][i] = new ChessPiece('P', false);
-            }
-
+            // Split FEN string into its components
+            String[] fenParts = fen.split(" ");
+            String piecePositions = fenParts[0];
             
-            pieces[7] = new ChessPiece[]{
-                new ChessPiece('R', true), new ChessPiece('N', true),
-                new ChessPiece('B', true), new ChessPiece('Q', true),
-                new ChessPiece('K', true), new ChessPiece('B', true),
-                new ChessPiece('N', true), new ChessPiece('R', true)
-            };
-            for (int i = 0; i < BOARD_SIZE; i++) {
-                pieces[6][i] = new ChessPiece('P', true);
+            // Parse piece positions
+            String[] ranks = piecePositions.split("/");
+            for (int rank = 0; rank < 8; rank++) {
+                int file = 0;
+                for (char c : ranks[rank].toCharArray()) {
+                    if (Character.isDigit(c)) {
+                        file += Character.getNumericValue(c);
+                    } else {
+                        boolean isWhite = Character.isUpperCase(c);
+                        char pieceType = Character.toUpperCase(c);
+                        pieces[rank][file] = new ChessPiece(pieceType, isWhite);
+                        file++;
+                    }
+                }
             }
+            
+            // Parse active color
+            isWhiteTurn = fenParts[1].equals("w");
+            
+            // Could also parse castling rights, en passant, halfmove clock, and fullmove number
+            // from fenParts[2], fenParts[3], fenParts[4], and fenParts[5] respectively
         }
 
         private void handleClick(int row, int col) {
@@ -98,7 +105,38 @@ public class ChessGame extends JFrame {
                 pieces[toRow][toCol] = pieces[fromRow][fromCol];
                 pieces[fromRow][fromCol] = null;
                 isWhiteTurn = !isWhiteTurn;
+                
+                // Generate FEN string after move
+                String currentFEN = generateFEN();
             }
+        }
+
+        private String generateFEN() {
+            StringBuilder fen = new StringBuilder();
+            for (int rank = 0; rank < 8; rank++) {
+                int emptyCount = 0;
+                for (int file = 0; file < 8; file++) {
+                    ChessPiece piece = pieces[rank][file];
+                    if (piece == null) {
+                        emptyCount++;
+                    } else {
+                        if (emptyCount > 0) {
+                            fen.append(emptyCount);
+                            emptyCount = 0;
+                        }
+                        char pieceChar = piece.type;
+                        fen.append(piece.isWhite ? pieceChar : Character.toLowerCase(pieceChar));
+                    }
+                }
+                if (emptyCount > 0) {
+                    fen.append(emptyCount);
+                }
+                if (rank < 7) fen.append('/');
+            }
+            fen.append(' ').append(isWhiteTurn ? 'w' : 'b');
+            fen.append(" KQkq - 0 1");
+            
+            return fen.toString();
         }
 
         private boolean isValidMove(int fromRow, int fromCol, int toRow, int toCol) {
@@ -192,6 +230,54 @@ public class ChessGame extends JFrame {
         ChessPiece(char type, boolean isWhite) {
             this.type = type;
             this.isWhite = isWhite;
+        }
+    }
+    static class Pawn extends ChessPiece {
+        char type;
+        boolean isWhite;
+
+        Pawn(char type, boolean isWhite) {
+            super('P', isWhite);
+        }
+    }
+    static class Knight extends ChessPiece {
+        char type;
+        boolean isWhite;
+
+        Knight(char type, boolean isWhite) {
+            super('N', isWhite);
+        }
+    }
+    static class Bishop extends ChessPiece {
+        char type;
+        boolean isWhite;
+
+        Bishop(char type, boolean isWhite) {
+            super('B', isWhite);
+        }
+    }
+    static class Rook extends ChessPiece {
+        char type;
+        boolean isWhite;
+
+        Rook(char type, boolean isWhite) {
+            super('R', isWhite);
+        }
+    }
+    static class Queen extends ChessPiece {
+        char type;
+        boolean isWhite;
+
+        Queen(char type, boolean isWhite) {
+            super('Q', isWhite);
+        }
+    }
+    static class King extends ChessPiece {
+        char type;
+        boolean isWhite;
+
+        King(char type, boolean isWhite) {
+            super('K', isWhite);
         }
     }
 
